@@ -1,15 +1,23 @@
 import { apiRequest } from './queryClient';
 import { Movie, Genre, UserRating, UserWatchlistItem, UserPreferences } from '@shared/schema';
 
-// TMDB Image URL helpers
+// Image URL helpers for local dataset
 export const getPosterUrl = (path: string | null, size: string = 'w500'): string => {
-  if (!path) return '/placeholder-poster.jpg';
-  return `https://image.tmdb.org/t/p/${size}${path}`;
+  if (!path) return '/placeholder-poster.svg';
+  // If it's already a full URL, return it as is
+  if (path.startsWith('http')) {
+    return path;
+  }
+  return '/placeholder-poster.svg';
 };
 
 export const getBackdropUrl = (path: string | null, size: string = 'original'): string => {
-  if (!path) return '/placeholder-backdrop.jpg';
-  return `https://image.tmdb.org/t/p/${size}${path}`;
+  if (!path) return '/placeholder-backdrop.svg';
+  // If it's already a full URL, return it as is
+  if (path && path.startsWith('http')) {
+    return path;
+  }
+  return '/placeholder-backdrop.svg';
 };
 
 // Auth APIs

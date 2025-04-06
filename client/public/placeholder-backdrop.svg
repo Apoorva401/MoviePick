@@ -1,0 +1,8 @@
+<svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#2a2e3d"/>
+  <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="32" text-anchor="middle" fill="#ffffff">No Backdrop Available</text>
+  <g transform="translate(600, 320)">
+    <path d="M-40,-40 L-40,40 L40,0 Z" fill="#ffffff"/>
+    <rect x="-60" y="-60" width="120" height="120" stroke="#ffffff" stroke-width="2" fill="none"/>
+  </g>
+</svg>

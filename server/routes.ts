@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
@@ -9,10 +9,10 @@ import {
   insertUserWatchlistSchema,
   insertGenreSchema,
 } from "@shared/schema";
-import * as tmdbApi from "./api/tmdb";
+import * as movieApi from "./api/localMovies";
 
 // Middleware to check if user is authenticated
-function requireAuth(req: Request, res: Response, next: Function) {
+function requireAuth(req: Request, res: Response, next: NextFunction) {
   // For simplicity, we're using a simple session-based approach
   // In a real app, you'd use a proper auth system
   if (req.session && req.session.userId) {
@@ -22,10 +22,10 @@ function requireAuth(req: Request, res: Response, next: Function) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialize genres from TMDB API
+  // Initialize genres from local movie data
   const initGenres = async () => {
     try {
-      const genres = await tmdbApi.fetchGenres();
+      const genres = await movieApi.fetchGenres();
       for (const genre of genres) {
         await storage.createGenre(genre);
       }
@@ -103,7 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/logout", (req: Request, res: Response) => {
     if (req.session) {
-      req.session.destroy((err) => {
+      req.session.destroy((err: Error | null) => {
         if (err) {
           return res.status(500).json({ message: "Failed to logout" });
         }
@@ -153,7 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/movies/popular", async (req: Request, res: Response) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const movies = await tmdbApi.fetchPopularMovies(page);
+      const movies = await movieApi.fetchPopularMovies(page);
       return res.json(movies);
     } catch (error) {
       console.error("Get popular movies error:", error);
@@ -164,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/movies/top-rated", async (req: Request, res: Response) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const movies = await tmdbApi.fetchTopRatedMovies(page);
+      const movies = await movieApi.fetchTopRatedMovies(page);
       return res.json(movies);
     } catch (error) {
       console.error("Get top rated movies error:", error);
@@ -181,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Query parameter is required" });
       }
       
-      const movies = await tmdbApi.searchMovies(query, page);
+      const movies = await movieApi.searchMovies(query, page);
       return res.json(movies);
     } catch (error) {
       console.error("Search movies error:", error);
@@ -198,7 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid genre ID" });
       }
       
-      const movies = await tmdbApi.fetchMoviesByGenre(genreId, page);
+      const movies = await movieApi.fetchMoviesByGenre(genreId, page);
       return res.json(movies);
     } catch (error) {
       console.error("Get movies by genre error:", error);
@@ -214,7 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid movie ID" });
       }
       
-      const movie = await tmdbApi.fetchMovieDetails(movieId);
+      const movie = await movieApi.fetchMovieDetails(movieId);
       
       if (!movie) {
         return res.status(404).json({ message: "Movie not found" });
@@ -235,7 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid movie ID" });
       }
       
-      const movies = await tmdbApi.fetchSimilarMovies(movieId);
+      const movies = await movieApi.fetchSimilarMovies(movieId);
       return res.json(movies);
     } catch (error) {
       console.error("Get similar movies error:", error);
@@ -428,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ratedMovieIds = ratings.map(rating => rating.movieId);
       
       // Get recommendations based on preferences
-      const recommendations = await tmdbApi.fetchRecommendations(genreIds, ratedMovieIds, page);
+      const recommendations = await movieApi.fetchRecommendations(genreIds, ratedMovieIds, page);
       
       return res.json(recommendations);
     } catch (error) {

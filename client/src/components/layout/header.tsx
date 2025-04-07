@@ -16,12 +16,20 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Search, User, Menu } from "lucide-react";
+import { Search, User, Menu, Film, Heart, Star, Home, Compass } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import * as api from "@/lib/api";
 import { useDebounce } from "@/hooks/use-debounce";
 import useMobile from "@/hooks/use-mobile";
+
+// Define the User type to match the expected structure from the API
+interface UserData {
+  id: number;
+  username: string;
+  name?: string;
+  createdAt: string;
+}
 
 export default function Header() {
   const [location, navigate] = useLocation();
@@ -34,12 +42,12 @@ export default function Header() {
   const isMobile = useMobile();
 
   // Get current user
-  const { data: currentUser, isLoading: isLoadingUser } = useQuery({
+  const { data: currentUser, isLoading: isLoadingUser } = useQuery<UserData | null>({
     queryKey: ["/api/auth/me"],
-    onError: () => {
-      // We'll silence errors here since it might just mean the user isn't logged in
-    },
     retry: false,
+    staleTime: 300000, // 5 minutes
+    gcTime: 3600000, // 1 hour
+    meta: { silent: true },
   });
 
   // Logout mutation
@@ -100,37 +108,41 @@ export default function Header() {
           <nav className="hidden md:flex space-x-6">
             <Link
               href="/"
-              className={`font-medium hover:text-primary transition-colors ${
+              className={`font-medium hover:text-primary transition-colors flex items-center gap-1.5 ${
                 isActive("/") ? "text-primary" : ""
               }`}
             >
-              Home
+              <Home className="h-4 w-4" />
+              <span>Home</span>
             </Link>
             <Link
               href="/discover"
-              className={`font-medium hover:text-primary transition-colors ${
+              className={`font-medium hover:text-primary transition-colors flex items-center gap-1.5 ${
                 isActive("/discover") || location.includes("/discover")
                   ? "text-primary"
                   : ""
               }`}
             >
-              Discover
+              <Compass className="h-4 w-4" />
+              <span>Discover</span>
             </Link>
             <Link
               href="/watchlist"
-              className={`font-medium hover:text-primary transition-colors ${
+              className={`font-medium hover:text-primary transition-colors flex items-center gap-1.5 ${
                 isActive("/watchlist") ? "text-primary" : ""
               }`}
             >
-              Watchlist
+              <Heart className="h-4 w-4" />
+              <span>Watchlist</span>
             </Link>
             <Link
               href="/rated"
-              className={`font-medium hover:text-primary transition-colors ${
+              className={`font-medium hover:text-primary transition-colors flex items-center gap-1.5 ${
                 isActive("/rated") ? "text-primary" : ""
               }`}
             >
-              Rated
+              <Star className="h-4 w-4" />
+              <span>Rated</span>
             </Link>
           </nav>
         </div>

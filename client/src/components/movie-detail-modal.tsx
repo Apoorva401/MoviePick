@@ -165,7 +165,7 @@ export default function MovieDetailModal({
     }
 
     const trailer = movie.videos.results.find(
-      (video) =>
+      (video: { site: string; type: string; key: string }) =>
         video.site === "YouTube" &&
         (video.type === "Trailer" || video.type === "Teaser")
     );
@@ -211,20 +211,45 @@ export default function MovieDetailModal({
           <ScrollArea className="max-h-[90vh]">
             {/* Movie Header/Background */}
             <div
-              className="relative h-[200px] md:h-[300px] bg-cover bg-center"
+              className="relative h-[220px] md:h-[320px] lg:h-[360px] bg-cover bg-center bg-no-repeat"
               style={{
                 backgroundImage: `url(${getBackdropUrl(movie.backdrop_path)})`,
               }}
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent"></div>
+              {/* Gradient overlay for better text visibility */}
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
+              
+              {/* Close button */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute top-4 right-4 text-foreground/80 hover:text-foreground bg-background/50 hover:bg-background/70 rounded-full"
+                className="absolute top-4 right-4 text-white hover:text-white/90 bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-full z-10"
                 onClick={onClose}
               >
                 <X className="h-5 w-5" />
               </Button>
+              
+              {/* Movie title and rating on the backdrop */}
+              <div className="absolute bottom-0 left-0 right-0 p-6 z-10">
+                <div className="container max-w-screen-lg mx-auto">
+                  <h2 className="font-bold text-2xl md:text-3xl lg:text-4xl text-white drop-shadow-md">
+                    {movie.title}
+                  </h2>
+                  <div className="flex items-center mt-2">
+                    <div className="flex items-center bg-black/50 backdrop-blur-sm text-white px-2 py-1 rounded-md">
+                      <Star className="h-4 w-4 text-yellow-400 mr-1" />
+                      <span className="font-medium text-sm">
+                        {movie.vote_average ? movie.vote_average.toFixed(1) : "N/A"}
+                      </span>
+                    </div>
+                    {movie.vote_count > 0 && (
+                      <span className="text-xs text-white/80 ml-2">
+                        {movie.vote_count.toLocaleString()} votes
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Movie Content */}
@@ -232,23 +257,26 @@ export default function MovieDetailModal({
               <div className="flex flex-col md:flex-row gap-6">
                 {/* Poster and Actions */}
                 <div className="flex-none w-full md:w-[200px]">
-                  <div className="aspect-[2/3] bg-muted rounded-lg overflow-hidden md:mb-4">
+                  {/* Poster with shadow */}
+                  <div className="aspect-[2/3] bg-muted rounded-lg overflow-hidden md:mb-4 shadow-md">
                     <img
                       src={getPosterUrl(movie.poster_path)}
                       alt={`${movie.title} poster`}
                       className="w-full h-full object-cover"
                     />
                   </div>
+                  
+                  {/* Action buttons */}
                   <div className="hidden md:flex flex-col gap-3 mt-4">
                     <Button
-                      className="w-full"
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                       onClick={handleOpenTrailer}
                     >
                       <Play className="mr-2 h-4 w-4" /> Watch Trailer
                     </Button>
                     <Button
                       variant={isInWatchlist ? "outline" : "secondary"}
-                      className="w-full"
+                      className={`w-full ${isInWatchlist ? 'border-primary text-primary hover:bg-primary/10' : ''}`}
                       onClick={handleToggleWatchlist}
                     >
                       {isInWatchlist ? (
@@ -266,44 +294,43 @@ export default function MovieDetailModal({
 
                 {/* Movie Details */}
                 <div className="flex-1">
-                  <h2 className="font-bold text-2xl md:text-3xl">{movie.title}</h2>
-                  <div className="flex flex-wrap gap-3 mt-2">
+                  {/* We already have the title in the header, so we'll skip it here for cleaner design */}
+                  {/* <h2 className="font-bold text-2xl md:text-3xl">{movie.title}</h2> */}
+                  
+                  {/* Movie metadata badges */}
+                  <div className="flex flex-wrap gap-2 mt-0">
                     {movie.release_date && (
-                      <span className="bg-muted px-2 py-1 rounded text-sm">
+                      <span className="bg-primary/10 text-primary px-2 py-1 rounded-md text-sm font-medium">
                         {new Date(movie.release_date).getFullYear()}
                       </span>
                     )}
                     {movie.adult ? (
-                      <span className="bg-muted px-2 py-1 rounded text-sm">
+                      <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-2 py-1 rounded-md text-sm font-medium">
                         R
                       </span>
                     ) : (
-                      <span className="bg-muted px-2 py-1 rounded text-sm">
+                      <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded-md text-sm font-medium">
                         PG-13
                       </span>
                     )}
-                    <span className="bg-muted px-2 py-1 rounded text-sm">
-                      {formatRuntime(movie.runtime)}
-                    </span>
-                    <div className="flex items-center bg-muted px-2 py-1 rounded">
-                      <Star className="h-4 w-4 text-yellow-500 mr-1" />
-                      <span className="font-mono">
-                        {movie.vote_average ? movie.vote_average.toFixed(1) : "N/A"}
+                    {movie.runtime && (
+                      <span className="bg-muted px-2 py-1 rounded-md text-sm">
+                        {formatRuntime(movie.runtime)}
                       </span>
-                    </div>
+                    )}
                   </div>
 
                   {/* Mobile Action Buttons */}
                   <div className="flex md:hidden gap-3 mt-4">
                     <Button
-                      className="flex-1"
+                      className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
                       onClick={handleOpenTrailer}
                     >
-                      <Play className="mr-2 h-4 w-4" /> Trailer
+                      <Play className="mr-2 h-4 w-4" /> Watch Trailer
                     </Button>
                     <Button
                       variant={isInWatchlist ? "outline" : "secondary"}
-                      className="flex-1"
+                      className={`flex-1 ${isInWatchlist ? 'border-primary text-primary hover:bg-primary/10' : ''}`}
                       onClick={handleToggleWatchlist}
                     >
                       {isInWatchlist ? (
@@ -315,13 +342,13 @@ export default function MovieDetailModal({
                   </div>
 
                   {/* Genres */}
-                  <div className="mt-4">
-                    <h3 className="font-medium text-muted-foreground mb-2">Genres</h3>
+                  <div className="mt-6">
+                    <h3 className="font-medium text-base text-primary mb-2">Genres</h3>
                     <div className="flex flex-wrap gap-2">
-                      {movie.genres?.map((genre) => (
+                      {movie.genres?.map((genre: { id: number; name: string }) => (
                         <span
                           key={genre.id}
-                          className="bg-muted px-3 py-1 rounded-full text-sm"
+                          className="bg-card border border-border px-3 py-1 rounded-full text-sm"
                         >
                           {genre.name}
                         </span>
@@ -331,18 +358,18 @@ export default function MovieDetailModal({
 
                   {/* Overview */}
                   <div className="mt-6">
-                    <h3 className="font-medium text-muted-foreground mb-2">Overview</h3>
-                    <p className="text-foreground/80">{movie.overview}</p>
+                    <h3 className="font-medium text-base text-primary mb-2">Overview</h3>
+                    <p className="text-foreground/90 leading-relaxed">{movie.overview}</p>
                   </div>
 
                   {/* Cast */}
                   {movie.credits?.cast && movie.credits.cast.length > 0 && (
                     <div className="mt-6">
-                      <h3 className="font-medium text-muted-foreground mb-2">Cast</h3>
+                      <h3 className="font-medium text-base text-primary mb-3">Cast</h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                        {movie.credits.cast.slice(0, 8).map((actor) => (
-                          <div key={actor.id} className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-muted overflow-hidden flex-none">
+                        {movie.credits.cast.slice(0, 8).map((actor: { id: number; name: string; character: string; profile_path: string | null }) => (
+                          <div key={actor.id} className="flex items-center gap-2 bg-muted/40 p-2 rounded-lg hover:bg-muted/60 transition-colors duration-200">
+                            <div className="w-10 h-10 rounded-full bg-muted overflow-hidden flex-none shadow-sm">
                               {actor.profile_path ? (
                                 <img
                                   src={`https://image.tmdb.org/t/p/w92${actor.profile_path}`}
@@ -350,13 +377,13 @@ export default function MovieDetailModal({
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                                <div className="w-full h-full flex items-center justify-center bg-primary/20 text-primary">
                                   {actor.name.charAt(0)}
                                 </div>
                               )}
                             </div>
                             <div>
-                              <p className="text-sm line-clamp-1">{actor.name}</p>
+                              <p className="text-sm font-medium line-clamp-1">{actor.name}</p>
                               <p className="text-muted-foreground text-xs line-clamp-1">
                                 {actor.character}
                               </p>
@@ -369,28 +396,30 @@ export default function MovieDetailModal({
 
                   {/* Rating Section */}
                   <div className="mt-8 border-t border-border pt-6">
-                    <h3 className="font-medium mb-3">Rate This Movie</h3>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-medium text-base text-primary">Rate This Movie</h3>
+                      {userRating && (
+                        <span className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 px-3 py-1 rounded-full text-sm font-medium">
+                          Your Rating: {userRating}.0/5.0
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center p-3 bg-muted/40 rounded-lg">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Button
                           key={star}
                           variant="ghost"
                           size="icon"
-                          className={`text-2xl p-0 ${
+                          className={`text-2xl p-1 mx-1 ${
                             userRating && star <= userRating
                               ? "text-yellow-500"
                               : "text-muted-foreground hover:text-yellow-500"
                           }`}
                           onClick={() => handleRateMovie(star)}
                         >
-                          <Star className="h-6 w-6" />
+                          <Star className="h-7 w-7" />
                         </Button>
                       ))}
-                      {userRating && (
-                        <span className="ml-2 text-lg font-mono">
-                          {userRating}.0
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -398,10 +427,10 @@ export default function MovieDetailModal({
 
               {/* Similar Movies */}
               {similarMovies && similarMovies.length > 0 && (
-                <div className="mt-10">
-                  <h3 className="font-medium text-xl mb-4">Similar Movies</h3>
+                <div className="mt-10 pt-6 border-t border-border">
+                  <h3 className="font-medium text-lg text-primary mb-5">Similar Movies You Might Like</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {similarMovies.slice(0, 5).map((movie) => (
+                    {similarMovies.slice(0, 5).map((movie: Movie) => (
                       <div
                         key={movie.id}
                         className="group cursor-pointer"
@@ -414,17 +443,33 @@ export default function MovieDetailModal({
                           }
                         }}
                       >
-                        <div className="rounded-lg overflow-hidden bg-muted aspect-[2/3] transform transition-transform group-hover:scale-105">
-                          <img
-                            src={getPosterUrl(movie.poster_path, "w342")}
-                            alt={`${movie.title} poster`}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
+                        <div className="rounded-lg overflow-hidden bg-muted aspect-[2/3] shadow-md transform transition-all duration-300 group-hover:scale-105 group-hover:shadow-lg">
+                          <div className="relative w-full h-full">
+                            <img
+                              src={getPosterUrl(movie.poster_path, "w342")}
+                              alt={`${movie.title} poster`}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              <div className="absolute bottom-0 left-0 right-0 p-2">
+                                <span className="text-xs text-white/90 font-medium">
+                                  View Details
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <h4 className="text-sm mt-2 font-medium line-clamp-1">
-                          {movie.title}
-                        </h4>
+                        <div className="mt-2">
+                          <h4 className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors">
+                            {movie.title}
+                          </h4>
+                          {movie.release_date && (
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(movie.release_date).getFullYear()}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

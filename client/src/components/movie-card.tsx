@@ -74,80 +74,112 @@ export default function MovieCard({
 
   // Format genres for display
   const genreNames = movie.genres?.map(g => g.name) || [];
+  const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() : "";
 
   return (
     <div
-      className="group relative rounded-lg overflow-hidden bg-card h-[300px] transform transition-transform hover:scale-105 cursor-pointer"
+      className="group relative rounded-lg overflow-hidden bg-card shadow-md hover:shadow-xl transform transition-all duration-300 hover:scale-[1.02] cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => onViewDetails(movie)}
     >
-      <img
-        src={getPosterUrl(movie.poster_path)}
-        alt={`${movie.title} poster`}
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
-      <div
-        className={`absolute inset-0 bg-gradient-to-t from-background to-transparent 
-          ${isHovered ? "opacity-100" : "opacity-0"} 
-          flex flex-col justify-end p-4 transition-opacity`}
-      >
-        <h3 className="font-bold text-lg line-clamp-2">{movie.title}</h3>
-        <div className="flex items-center mt-1">
-          <Star className="h-4 w-4 text-yellow-500 mr-1" />
-          <span className="font-mono text-sm">
+      {/* Poster Image with Gradient Overlay */}
+      <div className="relative aspect-[2/3] overflow-hidden">
+        <img
+          src={getPosterUrl(movie.poster_path)}
+          alt={`${movie.title} poster`}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-70 transition-opacity" />
+        
+        {/* Rating Badge */}
+        <div className="absolute top-2 left-2 flex items-center bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full">
+          <Star className="h-3.5 w-3.5 text-yellow-400 mr-1" />
+          <span className="font-mono text-xs font-medium">
             {movie.vote_average ? movie.vote_average.toFixed(1) : "N/A"}
           </span>
         </div>
-        <div className="flex gap-1 mt-2 flex-wrap">
-          {genreNames.length > 0 ? (
-            genreNames.slice(0, 2).map((genre) => (
-              <span
-                key={genre}
-                className="text-xs bg-card px-2 py-0.5 rounded-full"
-              >
-                {genre}
-              </span>
-            ))
-          ) : (
-            movie.genre_ids?.slice(0, 2).map((id) => (
-              <span
-                key={id}
-                className="text-xs bg-card px-2 py-0.5 rounded-full"
-              >
-                ID: {id}
-              </span>
-            ))
-          )}
-        </div>
-        <Button
-          variant="default"
-          className="mt-3 w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium py-1.5 rounded-md flex items-center justify-center"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onViewDetails(movie);
-          }}
+        
+        {/* Year Badge */}
+        {releaseYear && (
+          <div className="absolute top-2 right-10 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full">
+            <span className="text-xs font-medium">{releaseYear}</span>
+          </div>
+        )}
+        
+        {/* Watchlist Button */}
+        {showWatchlistButton && (
+          <button
+            className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-sm hover:bg-primary/80 rounded-full text-white transition-colors duration-200"
+            onClick={handleToggleWatchlist}
+            title={inWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
+          >
+            {inWatchlist ? (
+              <BookmarkCheck className="h-4 w-4" />
+            ) : (
+              <Bookmark className="h-4 w-4" />
+            )}
+          </button>
+        )}
+        
+        {/* Hover Details Overlay */}
+        <div 
+          className={`absolute inset-0 flex flex-col justify-end p-3
+            transition-all duration-300 bg-gradient-to-t from-black/90 via-black/60 to-transparent
+            ${isHovered ? "opacity-100" : "opacity-0"}`}
         >
-          <Info className="h-4 w-4 mr-1" /> Details
-        </Button>
+          <div className="flex gap-1 mb-2 flex-wrap">
+            {genreNames.length > 0 ? (
+              genreNames.slice(0, 2).map((genre) => (
+                <span
+                  key={genre}
+                  className="text-xs bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded-full text-white"
+                >
+                  {genre}
+                </span>
+              ))
+            ) : (
+              movie.genre_ids?.slice(0, 2).map((id) => (
+                <span
+                  key={id}
+                  className="text-xs bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded-full text-white"
+                >
+                  ID: {id}
+                </span>
+              ))
+            )}
+          </div>
+          
+          <p className="text-xs text-white/80 line-clamp-2 mb-2">{movie.overview}</p>
+          
+          <Button
+            variant="default"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium py-1 rounded-md flex items-center justify-center"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDetails(movie);
+            }}
+          >
+            <Info className="h-3.5 w-3.5 mr-1" /> View Details
+          </Button>
+        </div>
       </div>
       
-      {/* Watchlist Button */}
-      {showWatchlistButton && (
-        <button
-          className="absolute top-2 right-2 p-2 bg-background/50 hover:bg-background rounded-full text-foreground/80 hover:text-primary transition-colors"
-          onClick={handleToggleWatchlist}
-          title={inWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
-        >
-          {inWatchlist ? (
-            <BookmarkCheck className="h-4 w-4 text-primary" />
-          ) : (
-            <Bookmark className="h-4 w-4" />
-          )}
-        </button>
-      )}
+      {/* Movie Title & Info Below Poster */}
+      <div className="p-2 bg-card">
+        <h3 className="font-medium text-sm line-clamp-1">{movie.title}</h3>
+        <div className="flex items-center justify-between mt-1">
+          <div className="flex items-center">
+            <Star className="h-3 w-3 text-yellow-500 mr-1" />
+            <span className="text-xs text-muted-foreground">
+              {movie.vote_average ? movie.vote_average.toFixed(1) : "N/A"}
+            </span>
+          </div>
+          <span className="text-xs text-muted-foreground">{releaseYear}</span>
+        </div>
+      </div>
     </div>
   );
 }

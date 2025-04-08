@@ -10,6 +10,8 @@ export const users = pgTable("users", {
   name: text("name"),
   avatar: text("avatar"),
   createdAt: timestamp("created_at").defaultNow(),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({

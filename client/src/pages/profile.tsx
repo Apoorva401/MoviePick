@@ -32,12 +32,31 @@ const registerSchema = z.object({
   path: ["confirmPassword"],
 });
 
+// Forgot password form schema
+const forgotPasswordSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Please enter a valid email address"),
+});
+
+// Reset password form schema
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  newPassword: z.string().min(6, "New password must be at least 6 characters"),
+  confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
 type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function Profile() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
+  const [resetToken, setResetToken] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -80,6 +99,25 @@ export default function Profile() {
       password: "",
       confirmPassword: "",
       name: "",
+    },
+  });
+  
+  // Forgot password form
+  const forgotPasswordForm = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      username: "",
+      email: "",
+    },
+  });
+  
+  // Reset password form
+  const resetPasswordForm = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      token: "",
+      newPassword: "",
+      confirmPassword: "",
     },
   });
 
@@ -148,6 +186,63 @@ export default function Profile() {
   // Handle register form submission
   const onRegisterSubmit = (values: RegisterFormValues) => {
     registerMutation.mutate(values);
+  };
+  
+  // Forgot password mutation
+  const forgotPasswordMutation = useMutation({
+    mutationFn: (values: ForgotPasswordFormValues) => api.forgotPassword(values.username, values.email),
+    onSuccess: (data) => {
+      if (data.resetToken) {
+        setResetToken(data.resetToken);
+        resetPasswordForm.setValue("token", data.resetToken);
+        setActiveTab("reset-password");
+        toast({
+          title: "Password Reset Initiated",
+          description: "A password reset token has been generated. Please enter your new password.",
+        });
+      } else {
+        toast({
+          title: "Password Reset Initiated",
+          description: "If an account with that username exists, a password reset link has been sent.",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Password Reset Failed",
+        description: "An error occurred while trying to reset your password. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: (values: ResetPasswordFormValues) => api.resetPassword(values.token, values.newPassword),
+    onSuccess: () => {
+      toast({
+        title: "Password Reset Successful",
+        description: "Your password has been successfully reset. You can now login with your new password.",
+      });
+      setActiveTab("login");
+    },
+    onError: (error) => {
+      toast({
+        title: "Password Reset Failed",
+        description: "Invalid or expired reset token. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Handle forgot password form submission
+  const onForgotPasswordSubmit = (values: ForgotPasswordFormValues) => {
+    forgotPasswordMutation.mutate(values);
+  };
+  
+  // Handle reset password form submission
+  const onResetPasswordSubmit = (values: ResetPasswordFormValues) => {
+    resetPasswordMutation.mutate(values);
   };
 
   // Redirect if user already logged in
@@ -236,9 +331,10 @@ export default function Profile() {
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsList className="grid w-full grid-cols-3 mb-6">
                     <TabsTrigger value="login">Login</TabsTrigger>
                     <TabsTrigger value="register">Register</TabsTrigger>
+                    <TabsTrigger value="forgot-password">Reset</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="login">
@@ -297,6 +393,15 @@ export default function Profile() {
                           onClick={() => setActiveTab("register")}
                         >
                           Register
+                        </button>
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Forgot your password?{" "}
+                        <button
+                          className="text-primary hover:underline"
+                          onClick={() => setActiveTab("forgot-password")}
+                        >
+                          Reset Password
                         </button>
                       </p>
                     </div>
@@ -386,6 +491,146 @@ export default function Profile() {
                           onClick={() => setActiveTab("login")}
                         >
                           Sign In
+                        </button>
+                      </p>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="forgot-password">
+                    <Form {...forgotPasswordForm}>
+                      <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)} className="space-y-4">
+                        <FormField
+                          control={forgotPasswordForm.control}
+                          name="username"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Username</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Enter your username" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={forgotPasswordForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email (Required for password reset link)</FormLabel>
+                              <FormControl>
+                                <Input type="email" placeholder="Enter your email address" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <Button 
+                          type="submit" 
+                          className="w-full"
+                          disabled={forgotPasswordMutation.isPending}
+                        >
+                          {forgotPasswordMutation.isPending ? (
+                            <>
+                              <LoadingSpinner size="sm" className="mr-2" />
+                              Processing...
+                            </>
+                          ) : (
+                            "Send Reset Instructions"
+                          )}
+                        </Button>
+                      </form>
+                    </Form>
+                    
+                    <div className="mt-4 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Remember your password?{" "}
+                        <button
+                          className="text-primary hover:underline"
+                          onClick={() => setActiveTab("login")}
+                        >
+                          Back to Login
+                        </button>
+                      </p>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="reset-password">
+                    <Form {...resetPasswordForm}>
+                      <form onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)} className="space-y-4">
+                        <FormField
+                          control={resetPasswordForm.control}
+                          name="token"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Reset Token</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Enter your reset token" 
+                                  {...field} 
+                                  disabled={!!resetToken}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={resetPasswordForm.control}
+                          name="newPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>New Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" placeholder="Enter your new password" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={resetPasswordForm.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirm New Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" placeholder="Confirm your new password" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <Button 
+                          type="submit" 
+                          className="w-full"
+                          disabled={resetPasswordMutation.isPending}
+                        >
+                          {resetPasswordMutation.isPending ? (
+                            <>
+                              <LoadingSpinner size="sm" className="mr-2" />
+                              Resetting Password...
+                            </>
+                          ) : (
+                            "Reset Password"
+                          )}
+                        </Button>
+                      </form>
+                    </Form>
+                    
+                    <div className="mt-4 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Remember your password?{" "}
+                        <button
+                          className="text-primary hover:underline"
+                          onClick={() => setActiveTab("login")}
+                        >
+                          Back to Login
                         </button>
                       </p>
                     </div>

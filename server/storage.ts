@@ -14,6 +14,11 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
+  // Password Reset methods
+  getUserByResetToken(token: string): Promise<User | undefined>;
+  generateResetToken(username: string): Promise<string | null>;
+  updatePassword(userId: number, newPassword: string): Promise<User | undefined>;
+  
   // Genre methods
   getGenres(): Promise<Genre[]>;
   getGenre(id: number): Promise<Genre | undefined>;
@@ -82,9 +87,62 @@ export class MemStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
     const now = new Date();
-    const user: User = { ...insertUser, id, createdAt: now };
+    const user: User = { 
+      ...insertUser, 
+      id, 
+      createdAt: now,
+      resetToken: null,
+      resetTokenExpiry: null
+    };
     this.users.set(id, user);
     return user;
+  }
+
+  // Password Reset methods
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const now = new Date();
+    return Array.from(this.users.values()).find(
+      (user) => user.resetToken === token && user.resetTokenExpiry && new Date(user.resetTokenExpiry) > now
+    );
+  }
+
+  async generateResetToken(username: string): Promise<string | null> {
+    const user = await this.getUserByUsername(username);
+    if (!user) return null;
+
+    // Generate a random token
+    const token = Math.random().toString(36).substring(2, 15) + 
+                 Math.random().toString(36).substring(2, 15);
+    
+    // Set token expiry (24 hours from now)
+    const expiry = new Date();
+    expiry.setHours(expiry.getHours() + 24);
+    
+    // Update user with reset token and expiry
+    const updatedUser = { 
+      ...user, 
+      resetToken: token, 
+      resetTokenExpiry: expiry 
+    };
+    
+    this.users.set(user.id, updatedUser);
+    return token;
+  }
+
+  async updatePassword(userId: number, newPassword: string): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+
+    // Update user password and clear reset token
+    const updatedUser = { 
+      ...user, 
+      password: newPassword,
+      resetToken: null,
+      resetTokenExpiry: null
+    };
+    
+    this.users.set(userId, updatedUser);
+    return updatedUser;
   }
 
   // Genre methods

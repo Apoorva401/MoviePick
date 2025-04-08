@@ -145,6 +145,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Password reset - request a reset token
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    try {
+      const { username, email } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ message: "Username is required" });
+      }
+      
+      const token = await storage.generateResetToken(username);
+      
+      if (!token) {
+        // Don't reveal if user exists
+        return res.status(200).json({ 
+          message: "If an account with that username exists, a password reset link has been sent." 
+        });
+      }
+      
+      // Import the SendGrid utility
+      const { sendPasswordResetEmail } = await import('./utils/sendgrid');
+      
+      // Try to send email if we have an API key and email was provided
+      let emailSent = false;
+      
+      if (process.env.SENDGRID_API_KEY && email) {
+        emailSent = await sendPasswordResetEmail(email, token, username);
+      }
+      
+      // Return the token directly if email wasn't sent
+      if (!emailSent) {
+        return res.status(200).json({ 
+          message: "Password reset initiated",
+          resetToken: token,
+          note: "Email service not configured. Use this token to reset your password."
+        });
+      } else {
+        return res.status(200).json({ 
+          message: "A password reset link has been sent to your email."
+        });
+      }
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      return res.status(500).json({ message: "An error occurred processing your request" });
+    }
+  });
+  
+  // Password reset - verify token and update password
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: "Token and new password are required" });
+      }
+      
+      const user = await storage.getUserByResetToken(token);
+      
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+      
+      // Update the user's password
+      const updatedUser = await storage.updatePassword(user.id, newPassword);
+      
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update password" });
+      }
+      
+      return res.status(200).json({ message: "Password has been reset successfully" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      return res.status(500).json({ message: "An error occurred resetting your password" });
+    }
+  });
+
   // Movie and genre routes
   app.get("/api/genres", async (_req: Request, res: Response) => {
     try {

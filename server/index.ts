@@ -2,21 +2,18 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import { storage } from "./storage";
 
-const MemoryStore = createMemoryStore(session);
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Set up session middleware
+// Set up session middleware with PostgreSQL session store
 app.use(session({
   secret: "movie-recommender-secret", // In production, this should be an environment variable
   resave: false,
   saveUninitialized: false,
-  store: new MemoryStore({
-    checkPeriod: 86400000 // Prune expired entries every 24h
-  }),
+  store: storage.sessionStore,
   cookie: { 
     secure: false, // Set to true if using HTTPS
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days

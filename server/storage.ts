@@ -5,6 +5,10 @@ import {
   userRatings, type UserRating, type InsertUserRating,
   userWatchlist, type UserWatchlistItem, type InsertUserWatchlistItem
 } from "@shared/schema";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
+import createMemoryStore from "memorystore";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -38,6 +42,9 @@ export interface IStorage {
   isMovieInWatchlist(userId: number, movieId: number): Promise<boolean>;
   addToWatchlist(watchlistItem: InsertUserWatchlistItem): Promise<UserWatchlistItem>;
   removeFromWatchlist(userId: number, movieId: number): Promise<void>;
+  
+  // Session store for auth
+  sessionStore: any; // Using any to avoid type issues with express-session
 }
 
 export class MemStorage implements IStorage {
@@ -51,6 +58,8 @@ export class MemStorage implements IStorage {
   private currentPreferencesId: number;
   private currentRatingId: number;
   private currentWatchlistId: number;
+  
+  sessionStore: session.SessionStore;
 
   constructor() {
     this.users = new Map();
@@ -63,6 +72,12 @@ export class MemStorage implements IStorage {
     this.currentPreferencesId = 1;
     this.currentRatingId = 1;
     this.currentWatchlistId = 1;
+
+    // Create a memory store for sessions
+    const MemoryStore = createMemoryStore(session);
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
+    });
 
     // Add a default user
     this.createUser({
@@ -271,4 +286,268 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { eq, and } from "drizzle-orm";
+import { db } from "./db";
+
+export class DatabaseStorage implements IStorage {
+  sessionStore: any;
+
+  constructor() {
+    // Create a PostgreSQL session store
+    const PostgresSessionStore = connectPg(session);
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true
+    });
+  }
+
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values({
+        username: insertUser.username,
+        password: insertUser.password,
+        name: insertUser.name || null,
+        avatar: insertUser.avatar || null,
+        createdAt: new Date(),
+        resetToken: null,
+        resetTokenExpiry: null
+      })
+      .returning();
+    return user;
+  }
+
+  // Password Reset methods
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const now = new Date();
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.resetToken, token),
+          // Check if resetTokenExpiry exists and is greater than now
+          // Drizzle handles the date comparison properly
+          // @ts-ignore
+          users.resetTokenExpiry.gt(now)
+        )
+      );
+    return user;
+  }
+
+  async generateResetToken(username: string): Promise<string | null> {
+    const user = await this.getUserByUsername(username);
+    if (!user) return null;
+
+    // Generate a random token
+    const token = Math.random().toString(36).substring(2, 15) + 
+                 Math.random().toString(36).substring(2, 15);
+    
+    // Set token expiry (24 hours from now)
+    const expiry = new Date();
+    expiry.setHours(expiry.getHours() + 24);
+    
+    // Update user with reset token and expiry
+    await db
+      .update(users)
+      .set({
+        resetToken: token,
+        resetTokenExpiry: expiry
+      })
+      .where(eq(users.id, user.id));
+    
+    return token;
+  }
+
+  async updatePassword(userId: number, newPassword: string): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        password: newPassword,
+        resetToken: null,
+        resetTokenExpiry: null
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    return updatedUser;
+  }
+
+  // Genre methods
+  async getGenres(): Promise<Genre[]> {
+    return db.select().from(genres);
+  }
+
+  async getGenre(id: number): Promise<Genre | undefined> {
+    const [genre] = await db.select().from(genres).where(eq(genres.id, id));
+    return genre;
+  }
+
+  async createGenre(genre: InsertGenre): Promise<Genre> {
+    const [newGenre] = await db
+      .insert(genres)
+      .values(genre)
+      .onConflictDoUpdate({
+        target: genres.id,
+        set: { name: genre.name }
+      })
+      .returning();
+    
+    return newGenre;
+  }
+
+  // User Preferences methods
+  async getUserPreferences(userId: number): Promise<UserPreferences | undefined> {
+    const [preferences] = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId));
+    
+    return preferences;
+  }
+
+  async createOrUpdateUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    const existingPreferences = await this.getUserPreferences(preferences.userId);
+    
+    if (existingPreferences) {
+      const [updatedPreferences] = await db
+        .update(userPreferences)
+        .set({
+          genreIds: preferences.genreIds,
+          actorIds: preferences.actorIds,
+          directorIds: preferences.directorIds
+        })
+        .where(eq(userPreferences.id, existingPreferences.id))
+        .returning();
+      
+      return updatedPreferences;
+    } else {
+      const [newPreferences] = await db
+        .insert(userPreferences)
+        .values(preferences)
+        .returning();
+      
+      return newPreferences;
+    }
+  }
+
+  // User Ratings methods
+  async getUserRatings(userId: number): Promise<UserRating[]> {
+    return db
+      .select()
+      .from(userRatings)
+      .where(eq(userRatings.userId, userId));
+  }
+
+  async getUserRatingForMovie(userId: number, movieId: number): Promise<UserRating | undefined> {
+    const [rating] = await db
+      .select()
+      .from(userRatings)
+      .where(
+        and(
+          eq(userRatings.userId, userId),
+          eq(userRatings.movieId, movieId)
+        )
+      );
+    
+    return rating;
+  }
+
+  async createOrUpdateUserRating(rating: InsertUserRating): Promise<UserRating> {
+    const existingRating = await this.getUserRatingForMovie(rating.userId, rating.movieId);
+    
+    if (existingRating) {
+      const [updatedRating] = await db
+        .update(userRatings)
+        .set({ rating: rating.rating })
+        .where(eq(userRatings.id, existingRating.id))
+        .returning();
+      
+      return updatedRating;
+    } else {
+      const [newRating] = await db
+        .insert(userRatings)
+        .values({
+          ...rating,
+          createdAt: new Date()
+        })
+        .returning();
+      
+      return newRating;
+    }
+  }
+
+  // User Watchlist methods
+  async getUserWatchlist(userId: number): Promise<UserWatchlistItem[]> {
+    return db
+      .select()
+      .from(userWatchlist)
+      .where(eq(userWatchlist.userId, userId));
+  }
+
+  async isMovieInWatchlist(userId: number, movieId: number): Promise<boolean> {
+    const [item] = await db
+      .select()
+      .from(userWatchlist)
+      .where(
+        and(
+          eq(userWatchlist.userId, userId),
+          eq(userWatchlist.movieId, movieId)
+        )
+      );
+    
+    return !!item;
+  }
+
+  async addToWatchlist(watchlistItem: InsertUserWatchlistItem): Promise<UserWatchlistItem> {
+    const isInWatchlist = await this.isMovieInWatchlist(watchlistItem.userId, watchlistItem.movieId);
+    
+    if (!isInWatchlist) {
+      const [newItem] = await db
+        .insert(userWatchlist)
+        .values({
+          ...watchlistItem,
+          addedAt: new Date()
+        })
+        .returning();
+      
+      return newItem;
+    } else {
+      const [existingItem] = await db
+        .select()
+        .from(userWatchlist)
+        .where(
+          and(
+            eq(userWatchlist.userId, watchlistItem.userId),
+            eq(userWatchlist.movieId, watchlistItem.movieId)
+          )
+        );
+      
+      return existingItem;
+    }
+  }
+
+  async removeFromWatchlist(userId: number, movieId: number): Promise<void> {
+    await db
+      .delete(userWatchlist)
+      .where(
+        and(
+          eq(userWatchlist.userId, userId),
+          eq(userWatchlist.movieId, movieId)
+        )
+      );
+  }
+}
+
+export const storage = new DatabaseStorage();

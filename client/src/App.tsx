@@ -8,6 +8,10 @@ import Discover from "@/pages/discover";
 import Watchlist from "@/pages/watchlist";
 import Rated from "@/pages/rated";
 import Profile from "@/pages/profile";
+import HelpCenter from "@/pages/help-center";
+import TermsOfUse from "@/pages/terms-of-use";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import Contact from "@/pages/contact";
 
 function Router() {
   return (
@@ -17,6 +21,13 @@ function Router() {
       <Route path="/watchlist" component={Watchlist} />
       <Route path="/rated" component={Rated} />
       <Route path="/profile" component={Profile} />
+      
+      {/* Support Pages */}
+      <Route path="/help-center" component={HelpCenter} />
+      <Route path="/terms-of-use" component={TermsOfUse} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/contact" component={Contact} />
+      
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

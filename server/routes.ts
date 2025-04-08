@@ -49,13 +49,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = await storage.getUserByUsername(username);
       
-      if (!user || user.password !== password) {
+      if (!user) {
+        console.log(`User not found: ${username}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
-      if (req.session) {
-        req.session.userId = user.id;
+      // Simple password comparison (in a real app, we'd use bcrypt)
+      if (user.password !== password) {
+        console.log(`Password mismatch for user: ${username}`);
+        return res.status(401).json({ message: "Invalid credentials" });
       }
+      
+      req.session.userId = user.id;
+      console.log(`User logged in: ${username} (ID: ${user.id})`);
       
       return res.json({ 
         id: user.id,
@@ -85,9 +91,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = await storage.createUser(result.data);
       
-      if (req.session) {
-        req.session.userId = user.id;
-      }
+      // Save user ID in session
+      req.session.userId = user.id;
+      console.log(`User registered: ${user.username} (ID: ${user.id})`);
       
       return res.status(201).json({ 
         id: user.id,

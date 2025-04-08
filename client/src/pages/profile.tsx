@@ -65,12 +65,15 @@ export default function Profile() {
     data: currentUser, 
     isLoading: isLoadingUser,
     isError: isUserError,
-  } = useQuery({
+  } = useQuery<{
+    id: number;
+    username: string;
+    name: string | null;
+    avatar: string | null;
+  } | null>({
     queryKey: ["/api/auth/me"],
-    onError: () => {
-      // Silence errors since user might not be logged in
-    },
     retry: false,
+    gcTime: 0, // Don't cache errors
   });
 
   // Get user preferences

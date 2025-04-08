@@ -88,8 +88,11 @@ export class MemStorage implements IStorage {
     const id = this.currentUserId++;
     const now = new Date();
     const user: User = { 
-      ...insertUser, 
-      id, 
+      id,
+      username: insertUser.username,
+      password: insertUser.password,
+      name: insertUser.name || null,
+      avatar: insertUser.avatar || null,
       createdAt: now,
       resetToken: null,
       resetTokenExpiry: null
@@ -173,14 +176,23 @@ export class MemStorage implements IStorage {
     
     if (existingPreferences) {
       const updatedPreferences: UserPreferences = {
-        ...existingPreferences,
-        ...preferences,
+        id: existingPreferences.id,
+        userId: preferences.userId,
+        genreIds: Array.isArray(preferences.genreIds) ? preferences.genreIds : null,
+        actorIds: Array.isArray(preferences.actorIds) ? preferences.actorIds : null,
+        directorIds: Array.isArray(preferences.directorIds) ? preferences.directorIds : null,
       };
       this.userPreferences.set(existingPreferences.id, updatedPreferences);
       return updatedPreferences;
     } else {
       const id = this.currentPreferencesId++;
-      const newPreferences: UserPreferences = { ...preferences, id };
+      const newPreferences: UserPreferences = { 
+        id,
+        userId: preferences.userId,
+        genreIds: Array.isArray(preferences.genreIds) ? preferences.genreIds : null,
+        actorIds: Array.isArray(preferences.actorIds) ? preferences.actorIds : null,
+        directorIds: Array.isArray(preferences.directorIds) ? preferences.directorIds : null,
+      };
       this.userPreferences.set(id, newPreferences);
       return newPreferences;
     }

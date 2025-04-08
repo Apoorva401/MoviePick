@@ -8,6 +8,8 @@ import Discover from "@/pages/discover";
 import Watchlist from "@/pages/watchlist";
 import Rated from "@/pages/rated";
 import Profile from "@/pages/profile";
+import Playlists from "@/pages/playlists";
+import PlaylistDetail from "@/pages/playlist-detail";
 import HelpCenter from "@/pages/help-center";
 import TermsOfUse from "@/pages/terms-of-use";
 import PrivacyPolicy from "@/pages/privacy-policy";
@@ -20,6 +22,8 @@ function Router() {
       <Route path="/discover" component={Discover} />
       <Route path="/watchlist" component={Watchlist} />
       <Route path="/rated" component={Rated} />
+      <Route path="/playlists" component={Playlists} />
+      <Route path="/playlist/:id" component={PlaylistDetail} />
       <Route path="/profile" component={Profile} />
       
       {/* Support Pages */}

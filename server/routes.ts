@@ -679,8 +679,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Get the playlist items
       const items = await storage.getPlaylistItems(playlistId);
-      return res.json(items);
+      
+      // Enhance items with movie details
+      const enhancedItems = await Promise.all(
+        items.map(async (item) => {
+          const movie = await movieApi.fetchMovieDetails(item.movieId);
+          return {
+            ...item,
+            movie: movie
+          };
+        })
+      );
+      
+      return res.json(enhancedItems);
     } catch (error) {
       console.error("Get playlist items error:", error);
       return res.status(500).json({ message: "Internal server error" });

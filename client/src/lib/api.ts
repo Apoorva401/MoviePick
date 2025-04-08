@@ -1,5 +1,5 @@
 import { apiRequest } from './queryClient';
-import { Movie, Genre, UserRating, UserWatchlistItem, UserPreferences } from '@shared/schema';
+import { Movie, Genre, UserRating, UserWatchlistItem, UserPreferences, UserPlaylist, PlaylistItem, EnhancedPlaylistItem } from '@shared/schema';
 
 // Image URL helpers for local dataset
 export const getPosterUrl = (path: string | null, size: string = 'w500'): string => {
@@ -152,4 +152,79 @@ export const removeFromWatchlist = async (movieId: number): Promise<void> => {
 export const getRecommendations = async (page: number = 1): Promise<Movie[]> => {
   const res = await apiRequest('GET', `/api/user/recommendations?page=${page}`, undefined);
   return res.json();
+};
+
+// Playlist APIs
+export const getUserPlaylists = async (): Promise<UserPlaylist[]> => {
+  const res = await apiRequest('GET', '/api/playlists', undefined);
+  return res.json();
+};
+
+export const getPublicPlaylists = async (): Promise<UserPlaylist[]> => {
+  const res = await apiRequest('GET', '/api/playlists/public', undefined);
+  return res.json();
+};
+
+export const getPlaylist = async (playlistId: number): Promise<UserPlaylist> => {
+  const res = await apiRequest('GET', `/api/playlists/${playlistId}`, undefined);
+  return res.json();
+};
+
+export const createPlaylist = async (playlist: {
+  name: string;
+  description?: string;
+  isPublic: boolean;
+}): Promise<UserPlaylist> => {
+  const res = await apiRequest('POST', '/api/playlists', playlist);
+  return res.json();
+};
+
+export const updatePlaylist = async (
+  playlistId: number,
+  updates: {
+    name?: string;
+    description?: string;
+    isPublic?: boolean;
+  }
+): Promise<UserPlaylist> => {
+  const res = await apiRequest('PUT', `/api/playlists/${playlistId}`, updates);
+  return res.json();
+};
+
+export const deletePlaylist = async (playlistId: number): Promise<void> => {
+  await apiRequest('DELETE', `/api/playlists/${playlistId}`, undefined);
+};
+
+export const getPlaylistItems = async (playlistId: number): Promise<EnhancedPlaylistItem[]> => {
+  const res = await apiRequest('GET', `/api/playlists/${playlistId}/items`, undefined);
+  return res.json();
+};
+
+export const addMovieToPlaylist = async (
+  playlistId: number,
+  movieId: number,
+  notes?: string
+): Promise<PlaylistItem> => {
+  const res = await apiRequest('POST', `/api/playlists/${playlistId}/items`, {
+    movieId,
+    notes,
+  });
+  return res.json();
+};
+
+export const removeMovieFromPlaylist = async (playlistId: number, movieId: number): Promise<void> => {
+  await apiRequest('DELETE', `/api/playlists/${playlistId}/items/${movieId}`, undefined);
+};
+
+export const updatePlaylistItemNotes = async (
+  playlistId: number,
+  movieId: number,
+  notes: string
+): Promise<PlaylistItem> => {
+  const res = await apiRequest('PUT', `/api/playlists/${playlistId}/items/${movieId}/notes`, { notes });
+  return res.json();
+};
+
+export const reorderPlaylistItems = async (playlistId: number, itemIds: number[]): Promise<void> => {
+  await apiRequest('PUT', `/api/playlists/${playlistId}/reorder`, { itemIds });
 };

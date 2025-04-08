@@ -16,7 +16,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Search, User, Menu, Film, Heart, Star, Home, Compass } from "lucide-react";
+import { Search, User, Menu, Film, Heart, Star, Home, Compass, ListVideo } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import * as api from "@/lib/api";
@@ -145,6 +145,15 @@ export default function Header() {
               <Star className="h-4 w-4" />
               <span>Rated</span>
             </Link>
+            <Link
+              href="/playlists"
+              className={`font-medium hover:text-primary transition-colors flex items-center gap-1.5 ${
+                isActive("/playlists") || location.includes("/playlist/") ? "text-primary" : ""
+              }`}
+            >
+              <ListVideo className="h-4 w-4" />
+              <span>Playlists</span>
+            </Link>
           </nav>
         </div>
 
@@ -225,6 +234,14 @@ export default function Header() {
                 >
                   Rated
                 </Link>
+                <Link
+                  href="/playlists"
+                  className={`font-medium hover:text-primary transition-colors ${
+                    isActive("/playlists") || location.includes("/playlist/") ? "text-primary" : ""
+                  }`}
+                >
+                  Playlists
+                </Link>
                 <div className="border-t border-border pt-4">
                   {currentUser ? (
                     <>
@@ -286,6 +303,9 @@ export default function Header() {
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href="/rated" className="cursor-pointer">Rated Movies</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/playlists" className="cursor-pointer">My Playlists</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

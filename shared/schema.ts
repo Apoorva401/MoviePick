@@ -130,6 +130,11 @@ export type InsertUserPlaylist = z.infer<typeof insertUserPlaylistSchema>;
 export type PlaylistItem = typeof playlistItems.$inferSelect;
 export type InsertPlaylistItem = z.infer<typeof insertPlaylistItemSchema>;
 
+// Enhanced PlaylistItem with movie details (returned by API)
+export interface EnhancedPlaylistItem extends PlaylistItem {
+  movie?: Movie | null;
+}
+
 // Movie type from TMDB API (not stored in database)
 export interface Movie {
   id: number;

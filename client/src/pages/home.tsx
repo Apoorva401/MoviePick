@@ -144,7 +144,11 @@ export default function Home() {
         {/* Recommendation Section */}
         <section className="py-8">
           <div className="container mx-auto px-4">
-            <h2 className="font-bold text-2xl mb-6">Recommended For You</h2>
+            <h2 className="font-bold text-2xl mb-6">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
+                MoviePick's
+              </span> Picks For You
+            </h2>
             
             {loadingRecommended ? (
               <div className="h-64 flex justify-center items-center">

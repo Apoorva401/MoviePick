@@ -229,9 +229,9 @@ export default function Profile() {
           <div className="max-w-md mx-auto">
             <Card>
               <CardHeader>
-                <CardTitle>Welcome to MovieMatch</CardTitle>
+                <CardTitle>Welcome to MoviePick</CardTitle>
                 <CardDescription>
-                  Sign in to your account or create a new one to get personalized movie recommendations, rate films, and build your watchlist.
+                  Sign in to your account or create a new one to get films handpicked just for you, rate movies, and build your watchlist.
                 </CardDescription>
               </CardHeader>
               <CardContent>

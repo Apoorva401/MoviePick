@@ -101,7 +101,8 @@ export default function Header() {
         <div className="flex items-center">
           {/* App Logo */}
           <Link href="/" className="flex items-center mr-8">
-            <span className="text-primary font-bold text-2xl">MovieMatch</span>
+            <span className="text-primary font-bold text-2xl">MoviePick</span>
+            <span className="ml-2 text-xs text-muted-foreground hidden sm:inline-block">Films Handpicked Just for You</span>
           </Link>
 
           {/* Desktop Navigation */}

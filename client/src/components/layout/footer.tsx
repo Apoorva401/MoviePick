@@ -6,9 +6,9 @@ export default function Footer() {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="font-bold text-lg mb-4">MovieMatch</h3>
+            <h3 className="font-bold text-lg mb-4">MoviePick</h3>
             <p className="text-muted-foreground text-sm">
-              Your personalized movie recommendation platform.
+              Films Handpicked Just for You
             </p>
           </div>
           <div>
@@ -88,7 +88,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="border-t border-border mt-8 pt-6 text-center text-muted-foreground text-sm">
-          <p>© {new Date().getFullYear()} MovieMatch. All rights reserved. Powered by the TMDb API.</p>
+          <p>© {new Date().getFullYear()} MoviePick. All rights reserved. Powered by the MovieLens Dataset.</p>
         </div>
       </div>
     </footer>

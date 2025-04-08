@@ -3,7 +3,9 @@ import {
   genres, type Genre, type InsertGenre,
   userPreferences, type UserPreferences, type InsertUserPreferences,
   userRatings, type UserRating, type InsertUserRating,
-  userWatchlist, type UserWatchlistItem, type InsertUserWatchlistItem
+  userWatchlist, type UserWatchlistItem, type InsertUserWatchlistItem,
+  userPlaylists, type UserPlaylist, type InsertUserPlaylist,
+  playlistItems, type PlaylistItem, type InsertPlaylistItem
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -43,6 +45,21 @@ export interface IStorage {
   addToWatchlist(watchlistItem: InsertUserWatchlistItem): Promise<UserWatchlistItem>;
   removeFromWatchlist(userId: number, movieId: number): Promise<void>;
   
+  // User Playlist methods
+  getUserPlaylists(userId: number): Promise<UserPlaylist[]>;
+  getPlaylist(playlistId: number): Promise<UserPlaylist | undefined>;
+  getPublicPlaylists(): Promise<UserPlaylist[]>;
+  createPlaylist(playlist: InsertUserPlaylist): Promise<UserPlaylist>;
+  updatePlaylist(playlistId: number, updates: Partial<Omit<InsertUserPlaylist, "userId">>): Promise<UserPlaylist | undefined>;
+  deletePlaylist(playlistId: number): Promise<void>;
+  
+  // Playlist Item methods
+  getPlaylistItems(playlistId: number): Promise<PlaylistItem[]>;
+  addItemToPlaylist(item: InsertPlaylistItem): Promise<PlaylistItem>;
+  removeItemFromPlaylist(playlistId: number, movieId: number): Promise<void>;
+  updatePlaylistItemNotes(playlistId: number, movieId: number, notes: string): Promise<PlaylistItem | undefined>;
+  reorderPlaylistItems(playlistId: number, itemIds: number[]): Promise<void>;
+  
   // Session store for auth
   sessionStore: any; // Using any to avoid type issues with express-session
 }
@@ -53,13 +70,17 @@ export class MemStorage implements IStorage {
   private userPreferences: Map<number, UserPreferences>;
   private userRatings: Map<number, UserRating>;
   private userWatchlist: Map<number, UserWatchlistItem>;
+  private userPlaylists: Map<number, UserPlaylist>;
+  private playlistItems: Map<number, PlaylistItem>;
   
   private currentUserId: number;
   private currentPreferencesId: number;
   private currentRatingId: number;
   private currentWatchlistId: number;
+  private currentPlaylistId: number;
+  private currentPlaylistItemId: number;
   
-  sessionStore: session.SessionStore;
+  sessionStore: any; // Using any to avoid type issues with express-session
 
   constructor() {
     this.users = new Map();
@@ -67,11 +88,15 @@ export class MemStorage implements IStorage {
     this.userPreferences = new Map();
     this.userRatings = new Map();
     this.userWatchlist = new Map();
+    this.userPlaylists = new Map();
+    this.playlistItems = new Map();
     
     this.currentUserId = 1;
     this.currentPreferencesId = 1;
     this.currentRatingId = 1;
     this.currentWatchlistId = 1;
+    this.currentPlaylistId = 1;
+    this.currentPlaylistItemId = 1;
 
     // Create a memory store for sessions
     const MemoryStore = createMemoryStore(session);
@@ -284,6 +309,146 @@ export class MemStorage implements IStorage {
       this.userWatchlist.delete(item.id);
     }
   }
+  
+  // User Playlist methods
+  async getUserPlaylists(userId: number): Promise<UserPlaylist[]> {
+    return Array.from(this.userPlaylists.values()).filter(
+      (playlist) => playlist.userId === userId
+    );
+  }
+  
+  async getPlaylist(playlistId: number): Promise<UserPlaylist | undefined> {
+    return this.userPlaylists.get(playlistId);
+  }
+  
+  async getPublicPlaylists(): Promise<UserPlaylist[]> {
+    return Array.from(this.userPlaylists.values()).filter(
+      (playlist) => playlist.isPublic
+    );
+  }
+  
+  async createPlaylist(playlist: InsertUserPlaylist): Promise<UserPlaylist> {
+    const id = this.currentPlaylistId++;
+    const now = new Date();
+    const newPlaylist: UserPlaylist = {
+      id,
+      userId: playlist.userId,
+      name: playlist.name,
+      description: playlist.description || null,
+      isPublic: playlist.isPublic || false,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.userPlaylists.set(id, newPlaylist);
+    return newPlaylist;
+  }
+  
+  async updatePlaylist(
+    playlistId: number, 
+    updates: Partial<Omit<InsertUserPlaylist, "userId">>
+  ): Promise<UserPlaylist | undefined> {
+    const playlist = await this.getPlaylist(playlistId);
+    if (!playlist) return undefined;
+    
+    const updatedPlaylist: UserPlaylist = {
+      ...playlist,
+      name: updates.name !== undefined ? updates.name : playlist.name,
+      description: updates.description !== undefined ? updates.description : playlist.description,
+      isPublic: updates.isPublic !== undefined ? updates.isPublic : playlist.isPublic,
+      updatedAt: new Date()
+    };
+    
+    this.userPlaylists.set(playlistId, updatedPlaylist);
+    return updatedPlaylist;
+  }
+  
+  async deletePlaylist(playlistId: number): Promise<void> {
+    // First remove all items in the playlist
+    const items = Array.from(this.playlistItems.values()).filter(
+      (item) => item.playlistId === playlistId
+    );
+    
+    for (const item of items) {
+      this.playlistItems.delete(item.id);
+    }
+    
+    // Then delete the playlist itself
+    this.userPlaylists.delete(playlistId);
+  }
+  
+  // Playlist Item methods
+  async getPlaylistItems(playlistId: number): Promise<PlaylistItem[]> {
+    return Array.from(this.playlistItems.values())
+      .filter((item) => item.playlistId === playlistId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  }
+  
+  async addItemToPlaylist(item: InsertPlaylistItem): Promise<PlaylistItem> {
+    const id = this.currentPlaylistItemId++;
+    const now = new Date();
+    
+    // Get the highest sort order
+    const items = await this.getPlaylistItems(item.playlistId);
+    const maxSortOrder = items.length > 0 
+      ? Math.max(...items.map(i => i.sortOrder || 0)) 
+      : -1;
+    
+    const newItem: PlaylistItem = {
+      id,
+      playlistId: item.playlistId,
+      movieId: item.movieId,
+      addedAt: now,
+      sortOrder: item.sortOrder !== undefined ? item.sortOrder : maxSortOrder + 1,
+      notes: item.notes || null
+    };
+    
+    this.playlistItems.set(id, newItem);
+    return newItem;
+  }
+  
+  async removeItemFromPlaylist(playlistId: number, movieId: number): Promise<void> {
+    const item = Array.from(this.playlistItems.values()).find(
+      (item) => item.playlistId === playlistId && item.movieId === movieId
+    );
+    
+    if (item) {
+      this.playlistItems.delete(item.id);
+    }
+  }
+  
+  async updatePlaylistItemNotes(
+    playlistId: number, 
+    movieId: number, 
+    notes: string
+  ): Promise<PlaylistItem | undefined> {
+    const item = Array.from(this.playlistItems.values()).find(
+      (item) => item.playlistId === playlistId && item.movieId === movieId
+    );
+    
+    if (!item) return undefined;
+    
+    const updatedItem: PlaylistItem = {
+      ...item,
+      notes
+    };
+    
+    this.playlistItems.set(item.id, updatedItem);
+    return updatedItem;
+  }
+  
+  async reorderPlaylistItems(playlistId: number, itemIds: number[]): Promise<void> {
+    // Update each item with new sort order
+    for (let i = 0; i < itemIds.length; i++) {
+      const item = this.playlistItems.get(itemIds[i]);
+      if (item && item.playlistId === playlistId) {
+        this.playlistItems.set(itemIds[i], {
+          ...item,
+          sortOrder: i
+        });
+      }
+    }
+  }
 }
 
 import { eq, and } from "drizzle-orm";
@@ -299,6 +464,145 @@ export class DatabaseStorage implements IStorage {
       pool,
       createTableIfMissing: true
     });
+  }
+  
+  // User Playlist methods
+  async getUserPlaylists(userId: number): Promise<UserPlaylist[]> {
+    return db
+      .select()
+      .from(userPlaylists)
+      .where(eq(userPlaylists.userId, userId));
+  }
+  
+  async getPlaylist(playlistId: number): Promise<UserPlaylist | undefined> {
+    const [playlist] = await db
+      .select()
+      .from(userPlaylists)
+      .where(eq(userPlaylists.id, playlistId));
+    
+    return playlist;
+  }
+  
+  async getPublicPlaylists(): Promise<UserPlaylist[]> {
+    return db
+      .select()
+      .from(userPlaylists)
+      .where(eq(userPlaylists.isPublic, true));
+  }
+  
+  async createPlaylist(playlist: InsertUserPlaylist): Promise<UserPlaylist> {
+    const now = new Date();
+    const [newPlaylist] = await db
+      .insert(userPlaylists)
+      .values({
+        ...playlist,
+        createdAt: now,
+        updatedAt: now
+      })
+      .returning();
+    
+    return newPlaylist;
+  }
+  
+  async updatePlaylist(
+    playlistId: number, 
+    updates: Partial<Omit<InsertUserPlaylist, "userId">>
+  ): Promise<UserPlaylist | undefined> {
+    const [updatedPlaylist] = await db
+      .update(userPlaylists)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(userPlaylists.id, playlistId))
+      .returning();
+    
+    return updatedPlaylist;
+  }
+  
+  async deletePlaylist(playlistId: number): Promise<void> {
+    // First delete all items in the playlist
+    await db
+      .delete(playlistItems)
+      .where(eq(playlistItems.playlistId, playlistId));
+    
+    // Then delete the playlist itself
+    await db
+      .delete(userPlaylists)
+      .where(eq(userPlaylists.id, playlistId));
+  }
+  
+  // Playlist Item methods
+  async getPlaylistItems(playlistId: number): Promise<PlaylistItem[]> {
+    return db
+      .select()
+      .from(playlistItems)
+      .where(eq(playlistItems.playlistId, playlistId))
+      .orderBy(playlistItems.sortOrder);
+  }
+  
+  async addItemToPlaylist(item: InsertPlaylistItem): Promise<PlaylistItem> {
+    // Get the highest sort order
+    const items = await this.getPlaylistItems(item.playlistId);
+    const maxSortOrder = items.length > 0 
+      ? Math.max(...items.map(i => i.sortOrder || 0)) 
+      : -1;
+    
+    const [newItem] = await db
+      .insert(playlistItems)
+      .values({
+        ...item,
+        sortOrder: item.sortOrder !== undefined ? item.sortOrder : maxSortOrder + 1,
+        addedAt: new Date()
+      })
+      .returning();
+    
+    return newItem;
+  }
+  
+  async removeItemFromPlaylist(playlistId: number, movieId: number): Promise<void> {
+    await db
+      .delete(playlistItems)
+      .where(
+        and(
+          eq(playlistItems.playlistId, playlistId),
+          eq(playlistItems.movieId, movieId)
+        )
+      );
+  }
+  
+  async updatePlaylistItemNotes(
+    playlistId: number, 
+    movieId: number, 
+    notes: string
+  ): Promise<PlaylistItem | undefined> {
+    const [updatedItem] = await db
+      .update(playlistItems)
+      .set({ notes })
+      .where(
+        and(
+          eq(playlistItems.playlistId, playlistId),
+          eq(playlistItems.movieId, movieId)
+        )
+      )
+      .returning();
+    
+    return updatedItem;
+  }
+  
+  async reorderPlaylistItems(playlistId: number, itemIds: number[]): Promise<void> {
+    // Update each item with new sort order
+    for (let i = 0; i < itemIds.length; i++) {
+      await db
+        .update(playlistItems)
+        .set({ sortOrder: i })
+        .where(
+          and(
+            eq(playlistItems.id, itemIds[i]),
+            eq(playlistItems.playlistId, playlistId)
+          )
+        );
+    }
   }
 
   // User methods

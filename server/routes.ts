@@ -8,6 +8,8 @@ import {
   insertUserRatingSchema,
   insertUserWatchlistSchema,
   insertGenreSchema,
+  insertUserPlaylistSchema,
+  insertPlaylistItemSchema,
 } from "@shared/schema";
 import * as movieApi from "./api/localMovies";
 
@@ -514,6 +516,317 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(recommendations);
     } catch (error) {
       console.error("Get recommendations error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Playlist routes
+  // Get all playlists for the current user
+  app.get("/api/playlists", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const playlists = await storage.getUserPlaylists(userId);
+      return res.json(playlists);
+    } catch (error) {
+      console.error("Get playlists error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get public playlists
+  app.get("/api/playlists/public", async (req: Request, res: Response) => {
+    try {
+      const playlists = await storage.getPublicPlaylists();
+      return res.json(playlists);
+    } catch (error) {
+      console.error("Get public playlists error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get a specific playlist by ID
+  app.get("/api/playlists/:id", async (req: Request, res: Response) => {
+    try {
+      const playlistId = parseInt(req.params.id);
+      
+      if (isNaN(playlistId)) {
+        return res.status(400).json({ message: "Invalid playlist ID" });
+      }
+      
+      const playlist = await storage.getPlaylist(playlistId);
+      
+      if (!playlist) {
+        return res.status(404).json({ message: "Playlist not found" });
+      }
+      
+      // If playlist is not public, check if the user is the owner
+      if (!playlist.isPublic) {
+        if (!req.session || !req.session.userId || req.session.userId !== playlist.userId) {
+          return res.status(403).json({ message: "You don't have permission to view this playlist" });
+        }
+      }
+      
+      return res.json(playlist);
+    } catch (error) {
+      console.error("Get playlist error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create a new playlist
+  app.post("/api/playlists", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      
+      const playlistData = {
+        ...req.body,
+        userId,
+      };
+      
+      const result = insertUserPlaylistSchema.safeParse(playlistData);
+      
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid playlist data", errors: result.error });
+      }
+      
+      const playlist = await storage.createPlaylist(result.data);
+      return res.status(201).json(playlist);
+    } catch (error) {
+      console.error("Create playlist error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update a playlist
+  app.put("/api/playlists/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const playlistId = parseInt(req.params.id);
+      
+      if (isNaN(playlistId)) {
+        return res.status(400).json({ message: "Invalid playlist ID" });
+      }
+      
+      // Check if the playlist exists and belongs to the user
+      const existingPlaylist = await storage.getPlaylist(playlistId);
+      
+      if (!existingPlaylist) {
+        return res.status(404).json({ message: "Playlist not found" });
+      }
+      
+      if (existingPlaylist.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to update this playlist" });
+      }
+      
+      // Update the playlist
+      const updatedPlaylist = await storage.updatePlaylist(playlistId, req.body);
+      return res.json(updatedPlaylist);
+    } catch (error) {
+      console.error("Update playlist error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete a playlist
+  app.delete("/api/playlists/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const playlistId = parseInt(req.params.id);
+      
+      if (isNaN(playlistId)) {
+        return res.status(400).json({ message: "Invalid playlist ID" });
+      }
+      
+      // Check if the playlist exists and belongs to the user
+      const existingPlaylist = await storage.getPlaylist(playlistId);
+      
+      if (!existingPlaylist) {
+        return res.status(404).json({ message: "Playlist not found" });
+      }
+      
+      if (existingPlaylist.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to delete this playlist" });
+      }
+      
+      // Delete the playlist
+      await storage.deletePlaylist(playlistId);
+      return res.json({ message: "Playlist deleted successfully" });
+    } catch (error) {
+      console.error("Delete playlist error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get all items in a playlist
+  app.get("/api/playlists/:id/items", async (req: Request, res: Response) => {
+    try {
+      const playlistId = parseInt(req.params.id);
+      
+      if (isNaN(playlistId)) {
+        return res.status(400).json({ message: "Invalid playlist ID" });
+      }
+      
+      const playlist = await storage.getPlaylist(playlistId);
+      
+      if (!playlist) {
+        return res.status(404).json({ message: "Playlist not found" });
+      }
+      
+      // If playlist is not public, check if the user is the owner
+      if (!playlist.isPublic) {
+        if (!req.session || !req.session.userId || req.session.userId !== playlist.userId) {
+          return res.status(403).json({ message: "You don't have permission to view this playlist" });
+        }
+      }
+      
+      const items = await storage.getPlaylistItems(playlistId);
+      return res.json(items);
+    } catch (error) {
+      console.error("Get playlist items error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Add an item to a playlist
+  app.post("/api/playlists/:id/items", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const playlistId = parseInt(req.params.id);
+      
+      if (isNaN(playlistId)) {
+        return res.status(400).json({ message: "Invalid playlist ID" });
+      }
+      
+      // Check if the playlist exists and belongs to the user
+      const existingPlaylist = await storage.getPlaylist(playlistId);
+      
+      if (!existingPlaylist) {
+        return res.status(404).json({ message: "Playlist not found" });
+      }
+      
+      if (existingPlaylist.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to modify this playlist" });
+      }
+      
+      const itemData = {
+        ...req.body,
+        playlistId
+      };
+      
+      const result = insertPlaylistItemSchema.safeParse(itemData);
+      
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid playlist item data", errors: result.error });
+      }
+      
+      const item = await storage.addItemToPlaylist(result.data);
+      return res.status(201).json(item);
+    } catch (error) {
+      console.error("Add item to playlist error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Remove an item from a playlist
+  app.delete("/api/playlists/:id/items/:movieId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const playlistId = parseInt(req.params.id);
+      const movieId = parseInt(req.params.movieId);
+      
+      if (isNaN(playlistId) || isNaN(movieId)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+      
+      // Check if the playlist exists and belongs to the user
+      const existingPlaylist = await storage.getPlaylist(playlistId);
+      
+      if (!existingPlaylist) {
+        return res.status(404).json({ message: "Playlist not found" });
+      }
+      
+      if (existingPlaylist.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to modify this playlist" });
+      }
+      
+      await storage.removeItemFromPlaylist(playlistId, movieId);
+      return res.json({ message: "Item removed from playlist" });
+    } catch (error) {
+      console.error("Remove item from playlist error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update notes for a playlist item
+  app.put("/api/playlists/:id/items/:movieId/notes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const playlistId = parseInt(req.params.id);
+      const movieId = parseInt(req.params.movieId);
+      const { notes } = req.body;
+      
+      if (isNaN(playlistId) || isNaN(movieId)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+      
+      if (typeof notes !== 'string') {
+        return res.status(400).json({ message: "Notes must be a string" });
+      }
+      
+      // Check if the playlist exists and belongs to the user
+      const existingPlaylist = await storage.getPlaylist(playlistId);
+      
+      if (!existingPlaylist) {
+        return res.status(404).json({ message: "Playlist not found" });
+      }
+      
+      if (existingPlaylist.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to modify this playlist" });
+      }
+      
+      const updatedItem = await storage.updatePlaylistItemNotes(playlistId, movieId, notes);
+      
+      if (!updatedItem) {
+        return res.status(404).json({ message: "Item not found in playlist" });
+      }
+      
+      return res.json(updatedItem);
+    } catch (error) {
+      console.error("Update playlist item notes error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Reorder playlist items
+  app.put("/api/playlists/:id/reorder", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session!.userId as number;
+      const playlistId = parseInt(req.params.id);
+      const { itemIds } = req.body;
+      
+      if (isNaN(playlistId)) {
+        return res.status(400).json({ message: "Invalid playlist ID" });
+      }
+      
+      if (!Array.isArray(itemIds)) {
+        return res.status(400).json({ message: "itemIds must be an array" });
+      }
+      
+      // Check if the playlist exists and belongs to the user
+      const existingPlaylist = await storage.getPlaylist(playlistId);
+      
+      if (!existingPlaylist) {
+        return res.status(404).json({ message: "Playlist not found" });
+      }
+      
+      if (existingPlaylist.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to modify this playlist" });
+      }
+      
+      await storage.reorderPlaylistItems(playlistId, itemIds);
+      return res.json({ message: "Playlist items reordered successfully" });
+    } catch (error) {
+      console.error("Reorder playlist items error:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   });

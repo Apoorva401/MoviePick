@@ -73,6 +73,41 @@ export const insertUserWatchlistSchema = createInsertSchema(userWatchlist).pick(
   movieId: true,
 });
 
+// User Playlists Table
+export const userPlaylists = pgTable("user_playlists", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  isPublic: boolean("is_public").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserPlaylistSchema = createInsertSchema(userPlaylists).pick({
+  userId: true,
+  name: true,
+  description: true,
+  isPublic: true,
+});
+
+// Playlist Items Table
+export const playlistItems = pgTable("playlist_items", {
+  id: serial("id").primaryKey(),
+  playlistId: integer("playlist_id").notNull().references(() => userPlaylists.id),
+  movieId: integer("movie_id").notNull(),
+  addedAt: timestamp("added_at").defaultNow(),
+  sortOrder: integer("sort_order").default(0),
+  notes: text("notes"),
+});
+
+export const insertPlaylistItemSchema = createInsertSchema(playlistItems).pick({
+  playlistId: true,
+  movieId: true,
+  sortOrder: true,
+  notes: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -88,6 +123,12 @@ export type InsertUserRating = z.infer<typeof insertUserRatingSchema>;
 
 export type UserWatchlistItem = typeof userWatchlist.$inferSelect;
 export type InsertUserWatchlistItem = z.infer<typeof insertUserWatchlistSchema>;
+
+export type UserPlaylist = typeof userPlaylists.$inferSelect;
+export type InsertUserPlaylist = z.infer<typeof insertUserPlaylistSchema>;
+
+export type PlaylistItem = typeof playlistItems.$inferSelect;
+export type InsertPlaylistItem = z.infer<typeof insertPlaylistItemSchema>;
 
 // Movie type from TMDB API (not stored in database)
 export interface Movie {

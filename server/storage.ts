@@ -9,7 +9,7 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
-import { pool } from "./db";
+//import { pool } from "./db";
 import createMemoryStore from "memorystore";
 
 // modify the interface with any CRUD methods
@@ -459,11 +459,11 @@ export class DatabaseStorage implements IStorage {
 
   constructor() {
     // Create a PostgreSQL session store
-    const PostgresSessionStore = connectPg(session);
-    this.sessionStore = new PostgresSessionStore({
-      pool,
-      createTableIfMissing: true
-    });
+    //const PostgresSessionStore = connectPg(session);
+    //this.sessionStore = new PostgresSessionStore({
+      //pool,
+      //createTableIfMissing: true
+    //});
   }
   
   // User Playlist methods
